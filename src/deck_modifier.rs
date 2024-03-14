@@ -13,6 +13,15 @@ struct Deck {
     metadata: Metadata,
 }
 
+impl Deck {
+    fn to_json(&self) -> String {
+        match serde_json::to_string(&self) {
+            Ok(json) => json,
+            Err(err) => panic!("Error converting deck to json: {}", err),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 struct Card {
     id: String,
@@ -35,6 +44,30 @@ fn convert_id_to_card_name(id: &String) -> String {
 
     card_name.to_string()
 }
+
+fn save_deck_to_file(deck: &Deck) {
+    let json = deck.to_json();
+    let file_name = format!("{}.json", deck.metadata.name);
+    std::fs::write(file_name, json).unwrap();
+}
+
+fn prepend_sor_to_id(id: &String) -> String {
+    let mut pack_id = "SOR_".to_string();
+    pack_id.push_str(&add_zero_to_id(id));
+    pack_id
+}
+
+fn add_zero_to_id(id: &String) -> String {
+    // given the id "12", return "012"
+    // given the id "1", return "001"
+    let mut new_id = id.clone();
+    if id.len() == 1 {
+        new_id = format!("00{}", id);
+    } else if id.len() == 2 {
+        new_id = format!("0{}", id);
+    }
+    new_id
+}
 pub fn create_new_deck() {
     println!("Creating a new deck");
 
@@ -46,6 +79,28 @@ pub fn create_new_deck() {
     let name_of_deck = name_of_deck.trim();
 
     let mut cards: HashMap<String, i32> = HashMap::new();
+
+    // leader card
+    let mut leader_id = String::new();
+    print!("Enter the id of the leader card: ");
+    io::stdout().flush().unwrap();
+    io::stdin().read_line(&mut leader_id).unwrap();
+
+    let leader_card = Card {
+        id: prepend_sor_to_id(&leader_id.trim().to_string()),
+        count: 1,
+    };
+
+    // base card
+    let mut base_id = String::new();
+    print!("Enter the id of the base card: ");
+    io::stdout().flush().unwrap();
+    io::stdin().read_line(&mut base_id).unwrap();
+
+    let base_card = Card {
+        id: prepend_sor_to_id(&base_id.trim().to_string()),
+        count: 1,
+    };
 
     loop {
         let mut id_of_card = String::new();
@@ -77,4 +132,26 @@ pub fn create_new_deck() {
             id.bold()
         );
     }
+
+    // convert cards to Vec<Card>
+    let deck = cards
+        .iter()
+        .map(|(id, count)| Card {
+            id: prepend_sor_to_id(id),
+            count: *count,
+        })
+        .collect::<Vec<Card>>();
+
+    let new_deck = Deck {
+        metadata: Metadata {
+            name: name_of_deck.to_string(),
+            author: "Anonymous".to_string(),
+        },
+        deck,
+        leader: leader_card,
+        base: base_card,
+        sideboard: vec![],
+    };
+
+    save_deck_to_file(&new_deck);
 }
